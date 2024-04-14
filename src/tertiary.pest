@@ -1,7 +1,7 @@
 file = { SOI ~ module_header ~ module_body? ~ module_footer ~ EOI }
 
 module_header = { "module" ~ ident ~ parameters? ~ ports? ~ ";" }
-module_body = { module_block (module_block)* }
+module_body = { top_level_stmt ~ (top_level_stmt)* }
 module_footer = { "endmodule" }
 
 parameters = { "#(" ~ param_block ~ ")"}
@@ -13,21 +13,39 @@ io_block = { io_line ~ ("," ~ io_line)* }
 io_line = { io_type ~ var_decl }
 io_type = { ("input" | "output" | "inout") }
 
-module_block = { var_decl | block_decl }
+top_level_stmt = { var_decl | block_decl }
 var_decl = { data_type ~ data_size? ~ csv_idents }
 block_decl = { assign_block | always_block }
 
-assign_block = { "assign" ~ ident ~ "=" ~ expr}
-always_block = { "always" ~ "begin" ~ "end"}
+assign_block = { "assign" ~ ident ~ "=" ~ expr ~ ";"}
+always_block = { "always" ~ sensitivity_list ~ block }
+block = { ("begin" ~ stmts ~ "end") | stmt}
+stmts = { stmt ~ (stmt)* }
+stmt = { var_assign | if_block }
+var_assign = { ident_write ~ "=" ~ expr ~ ";" }
+if_block = { "if" ~ expr ~ block }
 
-expr = { value }
+sensitivity_list = { "@(" ~ sensitivity_list_inner ~  ")"}
+sensitivity_list_inner = _{ csv_idents | "*" | time_based_sensitivity_list }
+time_based_sensitivity_list = _{ time_based_sensitivity ~ ("or" ~ time_based_sensitivity)* }
+time_based_sensitivity = _{ ("posedge" | "negedge") ~ ident }
 
 data_type = { ("reg" | "wire") }
 data_size = { "[" ~ value ~ ":" ~ value ~"]"}
 csv_idents = { ident ~ ("," ~ !(io_type) ~ ident)* }
 
+expr = { value | indexed_ident | ident | ("(" ~ expr ~ ")")}
+
+ident_write = _{ indexed_ident | ident }
+
+indexed_ident = @{ ident ~ index }
+index = { "[" ~ (single_index | range_index | span_index )~ "]"}
+single_index = { value+ }
+range_index = { value+ ~ ":" ~ value+ }
+span_index = { value+ ~ ("-:" | "+:") ~ value+ }
+
 value = @{ (num ~ "'" ~ value_type)? ~ num }
-value_type = { ("b" | "o" | "d" | "h") }
+value_type = { "b" | "o" | "d" | "h" }
 
 ident = @{ char+ }
 num = @{ digit+ }
