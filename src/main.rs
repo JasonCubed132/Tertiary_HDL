@@ -1,9 +1,17 @@
 use std::fs;
-use pest::Parser;
+use clap::Parser as cParser;
+use pest::Parser as pParser;
 use pest::iterators::Pair;
-use pest_derive::Parser;
+use pest_derive::Parser as pParser;
 
-#[derive(Parser)]
+#[derive(cParser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    #[arg(short, long)]
+    input_file: String
+}
+
+#[derive(pParser)]
 #[grammar = "tertiary.pest"]
 pub struct TertiaryParser;
 
@@ -27,7 +35,11 @@ fn print_parse<'a>(parsed: Pair<'a, Rule>, level: i32) {
 }
 
 fn main() {
-    let unparsed_file = fs::read_to_string("test/simple.t").expect("Couldn't find file");
+    let args = Args::parse();
+
+
+    let unparsed_file = fs::read_to_string(args.input_file)
+        .expect("Couldn't find file");
 
     let file = TertiaryParser::parse(Rule::file, unparsed_file.as_str())
         .expect("bad parse").next().unwrap();
