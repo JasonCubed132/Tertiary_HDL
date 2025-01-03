@@ -125,14 +125,14 @@ parameter_declaration = { "parameter" ~ list_of_param_assignments ~ ";" }
 list_of_param_assignments = { param_assignment ~ ("," ~ param_assignment)* }
 param_assignment = { IDENTIFIER ~ "=" ~ constant_expression }
 
-input_declaration = { "input" ~ range? ~ list_of_variables ~ ";" }
-output_declaration = { "output" ~ range? ~ list_of_variables ~ ";" }
-inout_declaration = { "inout" ~ range? ~ list_of_variables ~ ";" }
+input_declaration = { "input" ~ range? ~ list_of_variables_2 ~ ";" }
+output_declaration = { "output" ~ range? ~ list_of_variables_2 ~ ";" }
+inout_declaration = { "inout" ~ range? ~ list_of_variables_2 ~ ";" }
 net_declaration = {
-      (NETTYPE ~ expandrange? ~ delay? ~ list_of_variables ~ ";")
+      (NETTYPE ~ expandrange? ~ delay? ~ list_of_variables_2 ~ ";")
     | ("trireg" ~ charge_strength? ~ expandrange? ~ delay?)
 }
-_TO_CHECK_list_of_variables = {
+list_of_variables_1 = {
     NETTYPE ~ drive_strength? ~ expandrange? ~ delay? ~ list_of_assignments ~ ";"
 }
 
@@ -153,7 +153,7 @@ integer_declaration = {
     "integer" ~ list_of_register_variables ~ ";"
 }
 real_declaration = {
-    "real" ~ list_of_variables ~ ";"
+    "real" ~ list_of_variables_2 ~ ";"
 }
 event_declaration = {
     "event" ~ name_of_event ~ ("," ~ name_of_event)* ~ ";"
@@ -166,7 +166,7 @@ continuous_assign = {
 parameter_override = {
     "defparam" ~ list_of_param_assignments ~ ";"
 }
-list_of_variables = {
+list_of_variables_2 = {
     name_of_variable ~ ("," ~ name_of_variable)*
 }
 list_of_register_variables = {
@@ -295,8 +295,8 @@ statement = {
     | ("->" ~ name_of_event ~ ";")
     | seq_block
     | par_block
-    | task_enable
-    | system_task_enable
+    // | task_enable - causing issues
+    // | system_task_enable
     | ("disable" ~ name_of_task ~ ";")
     | ("disable" ~ name_of_block ~ ";")
     | ("assign" ~ assignment ~ ";")
@@ -324,7 +324,7 @@ case_item = {
     | ("default" ~ statement_or_null)
 }
 seq_block = {
-      ("begin" ~ statement ~ "end")
+      ("begin" ~ statement* ~ "end")
     | ("begin" ~ ":" ~ name_of_block ~ block_declaration* ~ statement* ~ "end")
 }
 par_block = {
@@ -387,8 +387,9 @@ expression1 = { primary | STRING | (UNARY_OPERATOR ~ primary)}
 //    | STRING
 //}
 UNARY_OPERATOR = {
-    "+" | "-" | "!" | "~" | "&" | "~&" | "|" | "^|" | "^" | "~^"
+    "+" | "-" | "!" | "~" | "&" | "~&" | "|" | "^|" | "^" | "~^" | custom_gate_designator
 }
+
 BINARY_OPERATOR = {
       "+"
     | "-"
@@ -411,7 +412,12 @@ BINARY_OPERATOR = {
     | "^~"
     | ">>"
     | "<<"
+    | custom_gate_designator
 }
+custom_gate_designator = {
+    "#" ~ "[" ~ gate_value ~ "]"
+}
+gate_value = { ("0" | "1" | "2")+ }
 QUESTION_MARK = { "?" }
 STRING = {"\"" ~ ASCII_ALPHANUMERIC* ~ "\""}
 primary = {
@@ -467,9 +473,9 @@ comment = { short_comment | long_comment }
 // COMMENT = { comment }
 short_comment = { "//" ~ comment_text ~ NEWLINE }
 long_comment = { "/*" ~ comment_text ~ "*/" }
-comment_text = { ASCII* }
+comment_text = @{ ASCII* }
 identifier = { IDENTIFIER ~ ("." ~ IDENTIFIER)*}
-IDENTIFIER = {
+IDENTIFIER = @{
     ("_" | ASCII_ALPHA) ~ ("_" | "$" | ASCII_ALPHANUMERIC)*
 }
 delay_control = {

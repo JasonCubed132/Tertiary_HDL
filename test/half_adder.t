@@ -1,9 +1,11 @@
 module half_adder(
-    input wire a, b,
-    output wire s, c
+    a, b,
+    s, c
 );
+input a, b;
+output s, c;
 
-assign s = a ^ b;
+assign s = a #[012012012] b;
 assign c = a | b;
 
 endmodule

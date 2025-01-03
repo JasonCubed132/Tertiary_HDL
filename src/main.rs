@@ -1,13 +1,13 @@
-use std::fs;
 use clap::Parser as cParser;
 use pest::{iterators::Pair, Parser};
 use pest_derive::Parser as pParser;
+use std::fs;
 
 #[derive(cParser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
     #[arg(short, long, value_delimiter = ' ', num_args = 1..)]
-    input_file: Vec<String>
+    input_file: Vec<String>,
 }
 
 #[derive(pParser)]
@@ -37,11 +37,13 @@ fn main() {
     let args = Args::parse();
 
     for file in args.input_file {
-        let unparsed_file = fs::read_to_string(file)
-            .expect("Couldn't find file");
+        let unparsed_file = fs::read_to_string(file).expect("Couldn't find file");
 
+        pest::set_error_detail(true);
         let file = TertiaryParser::parse(Rule::source_text, unparsed_file.as_str())
-            .expect("bad parse").next().unwrap();
+            .expect("bad parse")
+            .next()
+            .unwrap();
 
         print_parse(file, 0);
     }
