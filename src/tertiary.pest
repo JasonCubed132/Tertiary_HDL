@@ -1,74 +1,17 @@
-file = { SOI ~ module_header ~ module_body? ~ module_footer ~ EOI }
-
-module_header = { "module" ~ ident ~ parameters? ~ ports? ~ ";" }
-module_body = { top_level_stmt ~ (top_level_stmt)* }
-module_footer = { "endmodule" }
-
-parameters = { "#(" ~ param_block ~ ")"}
-param_block = { param_line ~ ("," ~ param_line)* }
-param_line = { "parameter" ~ ident ~ "=" ~ value }
-
-ports = {"(" ~ io_block ~ ")"}
-io_block = { io_line ~ ("," ~ io_line)* }
-io_line = { io_type ~ var_decl }
-io_type = { ("input" | "output" | "inout") }
-
-top_level_stmt = { var_decl | block_decl }
-var_decl = { data_type ~ data_size? ~ csv_idents }
-block_decl = { assign_block | always_block }
-
-assign_block = { "assign" ~ ident ~ "=" ~ expr ~ ";"}
-always_block = { "always" ~ sensitivity_list ~ block }
-block = { ("begin" ~ stmts ~ "end") | stmt}
-stmts = { stmt ~ (stmt)* }
-stmt = { var_assign | if_block }
-var_assign = { ident_write ~ "=" ~ expr ~ ";" }
-if_block = { "if" ~ expr ~ block }
-
-sensitivity_list = { "@(" ~ sensitivity_list_inner ~  ")"}
-sensitivity_list_inner = _{ csv_idents | "*" | time_based_sensitivity_list }
-time_based_sensitivity_list = _{ time_based_sensitivity ~ ("or" ~ time_based_sensitivity)* }
-time_based_sensitivity = _{ ("posedge" | "negedge") ~ ident }
-
-data_type = { ("reg" | "wire") }
-data_size = { "[" ~ value ~ ":" ~ value ~"]"}
-csv_idents = { ident ~ ("," ~ !(io_type) ~ ident)* }
-
-expr  = { expr2 }
-expr2 = { expr3 ~ ("^" ~ expr)? }
-expr3 = { expr4 ~ ("|" ~ expr)? }
-expr4 = _{ value | indexed_ident | ident | ("(" ~ expr ~ ")") }
-
-ident_write = _{ indexed_ident | ident }
-
-indexed_ident = @{ ident ~ index }
-index = { "[" ~ (single_index | range_index | span_index )~ "]"}
-single_index = { value }
-range_index = { value ~ ":" ~ value }
-span_index = { value ~ ("-:" | "+:") ~ value }
-
-value = @{ (num ~ "'" ~ value_type)? ~ num }
-value_type = { "b" | "o" | "d" | "h" }
-
-ident = @{ char+ ~ (char+ | digit+ | "_")* }
-num = @{ digit+ }
-
-digit = { ASCII_DIGIT }
-char = { ASCII_ALPHA }
-
 WHITESPACE = _{ " " | "\r" | "\n" }
 
-
-
-source_text = { description+ }
+// Section 1 - Source text
+source_text = { SOI ~ description+ ~ EOI }
 description = { module | UDP }
 module = { 
        ("module" ~ name_of_module ~ list_of_ports? ~ ";" ~ module_item* ~ "endmodule")
     |  ("macromodule" ~ name_of_module ~ list_of_ports? ~ ";" ~ module_item* ~ "endmodule")
 }
 name_of_module = { IDENTIFIER }
-list_of_ports = { port ~ ("," ~ port)* }
-port = { port_expression? | ("." ~ name_of_port ~ "(" ~ port_expression? ~ ")") }
+list_of_ports = { "(" ~ port ~ ("," ~ port)* ~ ")"}
+port = { port_expression | ("." ~ name_of_port ~ "(" ~ port_expression? ~ ")") | "" }
+// original rule was
+// port = { port_expression? | ("." ~ name_of_port ~ "(" ~ port_expression? ~ ")") }
 port_expression = { port_reference | ("{" ~ port_reference ~ ("," ~ port_reference)* ~ "}")}
 port_reference = {
       name_of_variable
@@ -94,7 +37,7 @@ module_item = {
     | module_instantiation
     | parameter_override
     | continuous_assign
-    | specify_block
+    // | specify_block
     | initial_statement
     | always_statement
     | task
@@ -176,6 +119,7 @@ tf_declaration = {
     | real_declaration
 }
 
+// Section 2 - Declarations
 
 parameter_declaration = { "parameter" ~ list_of_param_assignments ~ ";" }
 list_of_param_assignments = { param_assignment ~ ("," ~ param_assignment)* }
@@ -188,7 +132,7 @@ net_declaration = {
       (NETTYPE ~ expandrange? ~ delay? ~ list_of_variables ~ ";")
     | ("trireg" ~ charge_strength? ~ expandrange? ~ delay?)
 }
-list_of_variables = {
+_TO_CHECK_list_of_variables = {
     NETTYPE ~ drive_strength? ~ expandrange? ~ delay? ~ list_of_assignments ~ ";"
 }
 
@@ -200,7 +144,7 @@ expandrange = {
 }
 
 reg_declaration = {
-    "reg" ~ range? ~ list_of_register_variables;
+    "reg" ~ range? ~ list_of_register_variables ~ ";"
 }
 time_declaration = {
     "time" ~ list_of_register_variables ~ ";"
@@ -216,5 +160,333 @@ event_declaration = {
 }
 
 continuous_assign = {
-
+      ("assign" ~ drive_strength? ~ delay? ~ list_of_assignments ~ ";")
+    | (NETTYPE ~ drive_strength? ~ expandrange? ~ delay? ~ list_of_assignments ~ ";")
 }
+parameter_override = {
+    "defparam" ~ list_of_param_assignments ~ ";"
+}
+list_of_variables = {
+    name_of_variable ~ ("," ~ name_of_variable)*
+}
+list_of_register_variables = {
+    register_variable ~ ("," ~ register_variable)*
+}
+register_variable = {
+      name_of_register
+    | (name_of_memory ~ "[" ~ constant_expression ~ ":" ~ constant_expression ~ "]")
+}
+name_of_register = { IDENTIFIER }
+name_of_memory = { IDENTIFIER }
+name_of_event = { IDENTIFIER }
+charge_strength = { 
+      ("(" ~ "small" ~ ")")
+    | ("(" ~ "medium" ~ ")")
+    | ("(" ~ "large" ~ ")")
+}
+drive_strength = {
+      ( "(" ~ STRENGTH0 ~ "," ~ STRENGTH1 ~ ")" )
+    | ( "(" ~ STRENGTH1 ~ "," ~ STRENGTH0 ~ ")" )
+}
+STRENGTH0 = {
+    "supply0" | "strong0" | "pull0" | "week0" | "highz0"
+}
+STRENGTH1 = {
+    "supply1" | "strong1" | "pull1" | "week1" | "highz1"
+}
+range = {
+    "[" ~ constant_expression ~ ":" ~ constant_expression ~ "]"
+}
+list_of_assignments = {
+    assignment ~ ("," ~ assignment)*
+}
+
+// Section 3 - Primitive Instances
+
+gate_declaration = {
+    GATETYPE ~ drive_strength? ~ delay? ~ gate_instance ~ ("," ~ gate_instance)* ~ ";"
+}
+GATETYPE = {
+      "and"
+    | "nand"
+    | "or"
+    | "nor"
+    | "xor"
+    | "xnor"
+    | "buf"
+    | "bufif0"
+    | "bufif1"
+    | "not"
+    | "notif0"
+    | "notif1"
+    | "pulldown"
+    | "pullup"
+	| "nmos"
+    | "rnmos"
+    | "pmos"
+    | "rpmos"
+    | "cmos"
+    | "rcmos"
+    | "tran"
+    | "rtran"
+    | "tranif0"
+    | "rtranif0"
+    | "tranif1"
+    | "rtranif1"
+}
+delay = {
+    ("#" ~ number) | ("#" ~ identifier) | ("#" ~ "(" ~ mintypmax_expression ~ ("," ~ mintypmax_expression)? ~ ("," ~ mintypmax_expression)?)
+}
+gate_instance = {
+    name_of_gate_instance? ~ "(" ~ terminal ~ ("," ~ terminal)* ~ ")"
+}
+name_of_gate_instance = {
+    IDENTIFIER ~ range?
+}
+UDP_instantiation = {
+    name_of_UDP ~ drive_strength? ~ delay? ~ UDP_instance ~ ("," ~ UDP_instance)* ~ ";"
+}
+UDP_instance = { name_of_UDP_instance? ~ "(" ~ terminal ~ ("," ~ terminal)* }
+name_of_UDP_instance = { IDENTIFIER ~ range? }
+terminal = { expression | IDENTIFIER }
+
+// Section 4 - Module Instantiations
+
+module_instantiation = {
+    name_of_module ~ parameter_value_assignment? ~ module_instance ~ ("," ~ module_instance)* ~ ";"
+}
+parameter_value_assignment = { "#" ~ "(" ~ expression ~ ("," ~ expression)* ~ ")" }
+module_instance = { name_of_instance ~ "(" ~ list_of_module_connections? ~ ")" }
+name_of_instance = { IDENTIFIER ~ range? }
+list_of_module_connections = {
+      (module_port_connection ~ ("," ~ module_port_connection?)*)
+    | (named_port_connection ~ ("," ~ named_port_connection)*)
+}
+// this doesn't support (, a, b, c...) but I don't know how to solve this
+module_port_connection = { expression }
+// original rules:
+// list_of_module_connections = {
+//    (module_port_connection ~ ("," ~ module_port_connection)*)
+//    | (named_port_connection ~ ("," ~ named_port_connection)*)
+//}
+//module_port_connection = { expression | NULL }
+//NULL = { "" }
+named_port_connection = { "." ~ IDENTIFIER ~ "(" ~ expression ~ ")" }
+
+// Section 5 - Behavioural Statements
+
+initial_statement = { "initial" ~ statement }
+always_statement = { "always" ~ statement }
+statement_or_null = { statement | ";" }
+statement = {
+      (blocking_assignment ~ ";")
+    | (non_blocking_assignment ~ ";")
+    | ("if" ~ "(" ~ expression ~ ")" ~ statement_or_null)
+    | ("if" ~ "(" ~ expression ~ ")" ~ statement_or_null ~ "else" ~ statement_or_null)
+    | ("case" ~ "(" ~ expression ~ ")" ~ case_item+ ~ "endcase")
+    | ("casez" ~ "(" ~ expression ~ ")" ~ case_item+ ~ "endcase")
+    | ("casex" ~ "(" ~ expression ~ ")" ~ case_item+ ~ "endcase")
+    | ("forever" ~ statement)
+    | ("repeat" ~ "(" ~ expression ~ ")" ~ statement)
+    | ("while" ~ "(" ~ expression ~ ")" ~ statement)
+    | ("for" ~ "(" ~ assignment ~ ";" ~ expression ~ ";" ~ assignment ~ ")" ~ statement)
+    | (delay_or_event_control ~ statement_or_null)
+    | ("wait" ~ "(" ~ expression ~ ")" ~ statement_or_null)
+    | ("->" ~ name_of_event ~ ";")
+    | seq_block
+    | par_block
+    | task_enable
+    | system_task_enable
+    | ("disable" ~ name_of_task ~ ";")
+    | ("disable" ~ name_of_block ~ ";")
+    | ("assign" ~ assignment ~ ";")
+    | ("deassign" ~ lvalue ~ ";")
+    | ("force" ~ assignment ~ ";")
+    | ("release" ~ lvalue ~ ";")
+}
+assignment = { lvalue ~ "=" ~ expression }
+blocking_assignment = {
+      (lvalue ~ "=" ~ expression)
+    | (lvalue ~ "=" ~ delay_or_event_control ~ expression ~ ";")
+}
+non_blocking_assignment = {
+      (lvalue ~ "<=" ~ expression)
+    | (lvalue ~ "=" ~ delay_or_event_control ~ expression ~ ";")
+}
+delay_or_event_control = {
+      delay_control
+    | event_control
+    | ("repeat" ~ "(" ~ expression ~ ")" ~ event_control)
+}
+case_item = {
+      (expression ~ ("," ~ expression)* ~ ":" ~ statement_or_null)
+    | ("default" ~ ":" ~ statement_or_null)
+    | ("default" ~ statement_or_null)
+}
+seq_block = {
+      ("begin" ~ statement ~ "end")
+    | ("begin" ~ ":" ~ name_of_block ~ block_declaration* ~ statement* ~ "end")
+}
+par_block = {
+      ("fork" ~ statement* ~ "join")
+    | ("fork" ~ ":" ~ name_of_block ~ block_declaration* ~ statement* ~ "join")
+}
+name_of_block = { IDENTIFIER }
+block_declaration = {
+      parameter_declaration
+    | reg_declaration
+    | integer_declaration
+    | real_declaration
+    | time_declaration
+    | event_declaration
+}
+task_enable = {
+      name_of_task
+    | (name_of_task ~ "(" ~ expression ~ ("," ~ expression)* ~ ")" ~ ";")
+}
+system_task_enable = {
+      name_of_system_task
+    | (name_of_system_task ~ "(" ~ expression ~ ("," ~ expression)* ~ ")" ~ ";")
+}
+name_of_system_task = {
+    "$" ~ SYSTEM_IDENTIFIER
+}
+SYSTEM_IDENTIFIER = {
+    "display"
+}
+
+// Section 6 - Specify Section - skipping because I've never seen it used
+
+// Section 7 - Expressions
+
+lvalue = {
+      identifier
+    | (identifier ~ "[" ~ expression ~ "]")
+    | (identifier ~ "[" ~ constant_expression ~ ":" ~ constant_expression ~ "]")
+    | concatenation
+}
+constant_expression = { expression }
+mintypmax_expression = {
+      expression
+    | (expression ~ ":" ~ expression ~ ":" ~ expression)
+}
+expression = { expression3 }
+expression3 = {
+    expression2 ~ (QUESTION_MARK ~ expression ~ ":" ~ expression)?
+}
+expression2 = {
+    expression1 ~ (BINARY_OPERATOR ~ expression)?
+}
+expression1 = { primary | STRING | (UNARY_OPERATOR ~ primary)}
+// original rule
+// expression = {
+//    primary
+//    | (UNARY_OPERATOR ~ primary)
+//    | (expression ~ BINARY_OPERATOR ~ expression)
+//    | (expression ~ QUESTION_MARK ~ expression ~ ":" ~ expression)
+//    | STRING
+//}
+UNARY_OPERATOR = {
+    "+" | "-" | "!" | "~" | "&" | "~&" | "|" | "^|" | "^" | "~^"
+}
+BINARY_OPERATOR = {
+      "+"
+    | "-"
+    | "*"
+    | "/"
+    | "%"
+    | "=="
+    | "!="
+    | "==="
+    | "!=="
+    | "&&"
+    | "||"
+    | "<"
+    | "<="
+    | ">"
+    | ">="
+    | "&"
+    | "|"
+    | "^"
+    | "^~"
+    | ">>"
+    | "<<"
+}
+QUESTION_MARK = { "?" }
+STRING = {"\"" ~ ASCII_ALPHANUMERIC* ~ "\""}
+primary = {
+      number
+    | identifier
+    | (identifier ~ "[" ~ expression ~ "]")
+    | (identifier ~ "[" ~ constant_expression ~ ":" ~ constant_expression ~ "]")
+    | concatenation
+    | multiple_concatenation
+    | function_call
+    | ("(" ~ mintypmax_expression ~ ")") 
+}
+number = {
+      DECIMAL_NUMBER
+    | (UNSIGNED_NUMBER? ~ BASE ~ UNSIGNED_NUMBER)
+    | (DECIMAL_NUMBER ~ "." ~ UNSIGNED_NUMBER)
+    | (DECIMAL_NUMBER ~ ("." ~ UNSIGNED_NUMBER)? ~ "E" ~ DECIMAL_NUMBER)
+    | (DECIMAL_NUMBER ~ ("." ~ UNSIGNED_NUMBER)? ~ "e" ~ DECIMAL_NUMBER)
+}
+DECIMAL_NUMBER = {
+    ("+" | "-")? ~ (ASCII_DIGIT | "_")+
+}
+UNSIGNED_NUMBER = {
+    (ASCII_DIGIT | "_")+
+}
+BASE = {
+      "'b"
+    | "'B"
+    | "'o"
+    | "'O"
+    | "'d"
+    | "'D"
+    | "'h"
+    | "'H"
+}
+concatenation = {
+    "{" ~ expression ~ ("," ~ expression)* ~ "}"
+}
+multiple_concatenation = {
+    "{" ~ expression ~ "{" ~ expression ~ ("," ~ expression)* ~ "}" ~ "}"
+}
+function_call = {
+      (name_of_function ~ "(" ~ expression ~ ("," ~ expression)* ~ ")")
+    | (name_of_system_function ~ "(" ~ expression ~ ("," ~ expression)* ~ ")")
+    | name_of_system_function
+}
+name_of_system_function = {
+    "$" ~ SYSTEM_IDENTIFIER
+}
+
+// Section 8 - General
+comment = { short_comment | long_comment }
+// COMMENT = { comment }
+short_comment = { "//" ~ comment_text ~ NEWLINE }
+long_comment = { "/*" ~ comment_text ~ "*/" }
+comment_text = { ASCII* }
+identifier = { IDENTIFIER ~ ("." ~ IDENTIFIER)*}
+IDENTIFIER = {
+    ("_" | ASCII_ALPHA) ~ ("_" | "$" | ASCII_ALPHANUMERIC)*
+}
+delay_control = {
+    ("#" ~ number)
+  | ("#" ~ identifier)
+  | ("#" ~ "(" ~ mintypmax_expression ~ ")")
+}
+event_control = {
+      ("@" ~ identifier)
+    | ("@" ~ "(" ~ event_expression ~ ")")
+}
+event_expression = {
+    event_expression1 ~ ("or" ~ event_expression)?
+}
+event_expression1 = {
+    expression
+    | ("posedge" ~ scalar_event_expression)
+    | ("negedge" ~ scalar_event_expression)
+}
+scalar_event_expression = { expression }

@@ -40,7 +40,7 @@ fn main() {
         let unparsed_file = fs::read_to_string(file)
             .expect("Couldn't find file");
 
-        let file = TertiaryParser::parse(Rule::file, unparsed_file.as_str())
+        let file = TertiaryParser::parse(Rule::source_text, unparsed_file.as_str())
             .expect("bad parse").next().unwrap();
 
         print_parse(file, 0);
